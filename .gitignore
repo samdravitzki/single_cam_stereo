@@ -1,0 +1,6 @@
+.idea/
+calibration_images/
+camera_parameters/
+input_images/
+output_images/
+venv/
