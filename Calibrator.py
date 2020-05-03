@@ -77,6 +77,28 @@ class Calibrator:
         self.focal_length = focal_length_exif[0] / focal_length_exif[1]
         self.save_parameters()
 
+
+    def undistort_image(self, image):
+        # Get the height and width (images must have equal size)
+        image_height, image_width = image.shape[:2]
+
+        # Calculate an optimal matrix based on the free scaling parameter
+        # (A parameter that allows us to rescale the image and still keep a valid matrix)
+        optimal_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+            self.camera_matrix,
+            self.distortion_coeff,
+            (image_width, image_height), 1, (image_width, image_height))
+
+        # Undistort the images with the optimal camera matrix
+        image_undistorted = cv2.undistort(
+            image,
+            self.camera_matrix,
+            self.distortion_coeff,
+            None,
+            optimal_camera_matrix)
+
+        return image_undistorted
+
     def save_parameters(self):
         rvecs, tvecs = self.vecs
         np.save("./camera_parameters/ret", self.ret)
@@ -87,10 +109,11 @@ class Calibrator:
         np.save("./camera_parameters/focal_length", self.focal_length)
 
     def load_parameters(self):
-        self.ret = np.load("./camera_parameters/ret")
-        self.camera_matrix = np.load("./camera_parameters/K")
-        self.distortion_coeff = np.load("./camera_parameters/dist")
-        self.vecs[0] = np.load("./camera_parameters/rvecs")
-        self.vecs[1] = np.load("./camera_parameters/tvecs")
-        self.focal_length = np.load("./camera_parameters/focal_length")
+        self.ret = np.load("./camera_parameters/ret.npy")
+        self.camera_matrix = np.load("./camera_parameters/K.npy")
+        self.distortion_coeff = np.load("./camera_parameters/dist.npy")
+        rvecs = np.load("./camera_parameters/rvecs.npy")
+        tvecs = np.load("./camera_parameters/tvecs.npy")
+        self.vecs = (rvecs, tvecs)
+        self.focal_length = np.load("./camera_parameters/focal_length.npy")
 
