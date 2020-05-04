@@ -95,14 +95,14 @@ class Calibrator:
             self.distortion_coeff,
             newCameraMatrix=optimal_camera_matrix)
 
-        pyplot.imshow(image_undistorted, 'gray')
-        pyplot.show()
+        # pyplot.imshow(image_undistorted, 'gray')
+        # pyplot.show()
 
         x, y, w, h = roi
         image_undistorted = image_undistorted[y:y+h, x:x+w]
 
-        pyplot.imshow(image_undistorted, 'gray')
-        pyplot.show()
+        # pyplot.imshow(image_undistorted, 'gray')
+        # pyplot.show()
 
         return image_undistorted
 

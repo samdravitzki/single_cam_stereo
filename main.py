@@ -9,7 +9,11 @@ from PIL import ImageTk, Image
 win_size = 5
 min_disp = -1
 max_disp = 63  # min_disp * 9
-
+block_size = 16
+uniqueness_ratio = 10
+speckle_window_size = 100
+speckle_range = 32
+disp_12_max_diff = 1
 
 def downsample_image(image, reduce_factor):
     for i in range(0, reduce_factor):
@@ -30,7 +34,21 @@ class StereoDisparityMap:
         self.left_image = left_image
         self.right_image = right_image
 
-    def calculate_SRGB_disparity_map(self, win_size, min_disp, max_disp):
+    # block_size = 16
+    # uniqueness_ratio = 10
+    # speckle_window_size = 100
+    # speckle_range = 32
+    # disp_12_max_diff = 1
+
+    def calculate_SRGB_disparity_map(self,
+                                     win_size,
+                                     min_disp,
+                                     max_disp,
+                                     _bs=16,
+                                     _ur=10,
+                                     _sws=100,
+                                     _sr=32,
+                                     _disp=1):
 
         num_disp = max_disp - min_disp
 
@@ -38,55 +56,64 @@ class StereoDisparityMap:
             raise ArithmeticError("max_disp - min_disp is not divisble by 16")
 
         # Downsample the image to make them easier to work with
-        image_left_downsampled = downsample_image(self.left_image, 3)
-        image_right_downsampled = downsample_image(self.right_image, 3)
+        # image_left_downsampled = downsample_image(self.left_image, 3)
+        # image_right_downsampled = downsample_image(self.right_image, 3)
+        image_left_downsampled = cv2.pyrDown(self.left_image)
+        image_right_downsampled = cv2.pyrDown(self.right_image)
 
-
+        window_size = 3
 
         stereo = cv2.StereoSGBM_create(
-            minDisparity=min_disp,
-            numDisparities=num_disp,
+            minDisparity=16,
+            numDisparities=112-min_disp,
+            blockSize=16,
             uniquenessRatio=10,
             speckleWindowSize=100,
             speckleRange=32,
             disp12MaxDiff=1,
-            P1=(8 * 3 * win_size ** 2),
-            P2=(32 * 3 * win_size ** 2)
+            P1=(8 * 3 * window_size ** 2),
+            P2=(32 * 3 * window_size ** 2)
         )
 
         # compute the disparity map
         print("computing the disparity map...")
         disparity_map = stereo.compute(image_left_downsampled, image_right_downsampled)
-
+        pyplot.imshow(disparity_map, 'gray')
+        pyplot.show()
         return disparity_map
 
-    def calculate_StereoBM_disparity_map(self, num_disparites, block_size):
+    def calculate_StereoBM_disparity_map(self,
+                                         num_disparites,
+                                         block_size):
         gray_left = cv2.cvtColor(self.left_image, cv2.COLOR_BGR2GRAY)
         gray_right = cv2.cvtColor(self.right_image, cv2.COLOR_BGR2GRAY)
+        image_left_downsampled = downsample_image(gray_left, 3)
+        image_right_downsampled = downsample_image(gray_right, 3)
         stereo = cv2.StereoBM_create(num_disparites, block_size)
-        disparity_map = stereo.compute(gray_left, gray_right)
+        disparity_map = stereo.compute(image_left_downsampled, image_right_downsampled)
         pyplot.imshow(disparity_map, 'gray')
         pyplot.show()
         return disparity_map
 
 
-calibrator = Calibrator(6, 9)
-# calibrator.calibrate("./calibration_images/standard/*", "./output_images/")
-calibrator.load_parameters()
+# calibrator = Calibrator(6, 9)
+# # calibrator.calibrate("./calibration_images/standard/*", "./output_images/")
+# calibrator.load_parameters()
+#
+# # image paths for stereo images
+# left_image_path = "./input_images/left3.jpg"
+# right_image_path = "./input_images/right3.jpg"
+#
+# # load the images in
+# left_image_ = cv2.imread(left_image_path)
+# right_image_ = cv2.imread(right_image_path)
+# left_image_undistorted = calibrator.undistort_image(left_image_)
+# right_image_undistorted = calibrator.undistort_image(right_image_)
 
-# image paths for stereo images
-left_image_path = "./input_images/left.jpg"
-right_image_path = "./input_images/right.jpg"
+aloe_left_image = cv2.imread("./input_images/aloeL.jpg")
+aloe_right_image = cv2.imread("./input_images/aloeL.jpg")
 
-# load the images in
-left_image = cv2.imread(left_image_path)
-right_image = cv2.imread(right_image_path)
-left_image_undistorted = calibrator.undistort_image(left_image)
-right_image_undistorted = calibrator.undistort_image(right_image)
-
-
-
-disparity_mapper = StereoDisparityMap(left_image, right_image)
+disparity_mapper = StereoDisparityMap(aloe_left_image, aloe_right_image)
 
 
 def recalculate_SGBM():
@@ -96,11 +123,20 @@ def recalculate_SGBM():
     global minimum_entry
     global maximum_entry
 
-
+    # _bs = 16,
+    # _ur = 10,
+    # _sws = 100,
+    # _sr = 32,
+    # _disp = 1):
     cv_img = disparity_mapper.calculate_SRGB_disparity_map(
         int(size_entry.get()),
         int(minimum_entry.get()),
-        int(maximum_entry.get()))
+        int(maximum_entry.get()),
+        int(bs_entry.get()),
+        int(ur_entry.get()),
+        int(sws_entry.get()),
+        int(sr_entry.get()),
+        int(disp_entry.get()))
     photo = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
     canvas.create_image(0, 0, image=photo, anchor=NW)
 
@@ -148,6 +184,44 @@ maximum.pack(anchor=W)
 maximum_entry = Entry(window)
 maximum_entry.insert(0, "15")
 maximum_entry.pack(anchor=W)
+
+
+
+bs = Label(window, text="block_size")
+bs.pack(anchor=W)
+
+bs_entry = Entry(window)
+bs_entry.insert(0, "16")
+bs_entry.pack(anchor=W)
+
+ur = Label(window, text="uniqueness_ratio")
+ur.pack(anchor=W)
+
+ur_entry = Entry(window)
+ur_entry.insert(0, "10")
+ur_entry.pack(anchor=W)
+
+
+sws = Label(window, text="speckle_window_size")
+sws.pack(anchor=W)
+
+sws_entry = Entry(window)
+sws_entry.insert(0, "100")
+sws_entry.pack(anchor=W)
+
+sr = Label(window, text="speckle_range")
+sr.pack(anchor=W)
+
+sr_entry = Entry(window)
+sr_entry.insert(0, "32")
+sr_entry.pack(anchor=W)
+
+disp = Label(window, text="disp_12_max_diff")
+disp.pack(anchor=W)
+
+disp_entry = Entry(window)
+disp_entry.insert(0, "1")
+disp_entry.pack(anchor=W)
 
 btn_recalibrate = Button(window, text="Recalibrate SGBM", width=50, command=recalculate_SGBM)
 btn_recalibrate.pack(anchor=CENTER, expand=True)
