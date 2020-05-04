@@ -7,12 +7,23 @@ Resulting .ply file cam be easily viewed using MeshLab ( http://meshlab.sourcefo
 import numpy as np
 import cv2 as cv
 
+def downsample_image(image, reduce_factor):
+    for i in range(0, reduce_factor):
+        # If the image is grayscale get the size differently
+        if len(image.shape) > 2:
+            row, col = image.shape[:2]
+        else:
+            row, col = image.shape
 
+        # Scale the image down by half each time
+        image = cv.pyrDown(image, dstsize=(col // 2, row // 2))
+
+    return image
 
 def main():
     print('loading images...')
-    imgL = cv.pyrDown(cv.imread("./input_images/aloeL.jpg"))  # downscale images for faster processing
-    imgR = cv.pyrDown(cv.imread("./input_images/aloeR.jpg"))
+    # imgL = downsample_image(cv.imread("./input_images/aloeL.jpg"), 1)  # downscale images for faster processing
+    # imgR = downsample_image(cv.imread("./input_images/aloeR.jpg"), 1)
 
     # disparity range is tuned for 'aloe' image pair
     window_size = 3
