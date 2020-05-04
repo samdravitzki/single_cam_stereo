@@ -3,6 +3,7 @@ import numpy as np
 import glob
 from PIL import ExifTags
 from PIL import Image
+from matplotlib import pyplot
 
 
 class Calibrator:
@@ -20,40 +21,39 @@ class Calibrator:
 
     def calibrate(self, input_directory, output_directory):
         chessboard = (self.row_count, self.col_count)
-        critera = (cv2.TERM_CRITERIA_EPS + cv2.TermCriteria_MAX_ITER, 30, 0.001)
-
-        # Empty object point
-        objp = np.zeros((self.row_count * self.col_count, 3), np.float32)
-        objp[:, :2] = np.mgrid[0:self.col_count, 0:self.row_count].T.reshape(-1, 2)
 
         objpoints = []
         imgpoints = []
+        # Prepare grid and the points to display
+        objp = np.zeros((np.product(chessboard), 3), dtype=np.float32)
+        objp[:, :2] = np.mgrid[0:chessboard[0], 0:chessboard[1]].T.reshape(-1, 2)
 
-        # Select the directory containing the calibration images
-        calibration_images = glob.glob(input_directory)
-        gray_scale = None
+        calibration_paths = glob.glob(input_directory)
 
-        # iterate over image calculating the intrinsic matrix
-        for i, image_src in enumerate(calibration_images):
-            # Create a grayscale version of the image
-            image = cv2.imread(image_src)
-            gray_scale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        for i, image_path in enumerate(calibration_paths):
+            image = cv2.imread(image_path)
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            print("Image loaded, Analysing {0}...".format(image_path))
+            #find the chessboard corners
+            ret, corners = cv2.findChessboardCorners(gray_image, chessboard, None)
 
-            # Find the chessboard images corners
-            success, corners = cv2.findChessboardCorners(gray_scale, chessboard, None)
-
-            # If the corners are found
-            if success:
+            if ret == True:
+                print("Chessboard detected!")
+                # define criteria for subpixel accuracy
+                critera = (cv2.TERM_CRITERIA_EPS + cv2.TermCriteria_MAX_ITER, 30, 0.001)
+                # refine corner location based on criteria
+                improved_corners = cv2.cornerSubPix(gray_image, corners, (5, 5), (-1, -1), critera)
                 objpoints.append(objp)
-                refined_corners = cv2.cornerSubPix(gray_scale, corners, (5, 5), (-1, -1), critera)
-                imgpoints.append(refined_corners)  # append the refined camera matrix
-                # draw corners on the image
-                image = cv2.drawChessboardCorners(image, chessboard, refined_corners, success)
+                imgpoints.append(improved_corners)
+                image = cv2.drawChessboardCorners(image, chessboard, improved_corners, ret)
                 cv2.imwrite("{0}draw-{1}.jpg".format(output_directory, i), image)
-
+            else:
+                print("Chessboard not detected!")
         # calibrate image based on the images
         ret, camera_matrix, distortion_coeff, rvecs, tvecs \
-            = cv2.calibrateCamera(objpoints, imgpoints, gray_scale.shape[::-1], None, None)
+            = cv2.calibrateCamera(objpoints, imgpoints, gray_image.shape[::-1], None, None)
+
+
 
         self.ret = ret
         self.camera_matrix = camera_matrix
@@ -62,7 +62,7 @@ class Calibrator:
 
         # Get the focal-point form the mobile image meta data
 
-        exif_image = Image.open(calibration_images[0])
+        exif_image = Image.open(calibration_paths[0])
 
         # Select all meta data from the first image
         exif_data = {
@@ -76,7 +76,6 @@ class Calibrator:
 
         self.focal_length = focal_length_exif[0] / focal_length_exif[1]
         self.save_parameters()
-
 
     def undistort_image(self, image):
         # Get the height and width (images must have equal size)
@@ -94,8 +93,16 @@ class Calibrator:
             image,
             self.camera_matrix,
             self.distortion_coeff,
-            None,
-            optimal_camera_matrix)
+            newCameraMatrix=optimal_camera_matrix)
+
+        pyplot.imshow(image_undistorted, 'gray')
+        pyplot.show()
+
+        x, y, w, h = roi
+        image_undistorted = image_undistorted[y:y+h, x:x+w]
+
+        pyplot.imshow(image_undistorted, 'gray')
+        pyplot.show()
 
         return image_undistorted
 

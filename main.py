@@ -41,6 +41,8 @@ class StereoDisparityMap:
         image_left_downsampled = downsample_image(self.left_image, 3)
         image_right_downsampled = downsample_image(self.right_image, 3)
 
+
+
         stereo = cv2.StereoSGBM_create(
             minDisparity=min_disp,
             numDisparities=num_disp,
@@ -55,8 +57,7 @@ class StereoDisparityMap:
         # compute the disparity map
         print("computing the disparity map...")
         disparity_map = stereo.compute(image_left_downsampled, image_right_downsampled)
-        # pyplot.imshow(disparity_map, 'gray')
-        # pyplot.show()
+
         return disparity_map
 
     def calculate_StereoBM_disparity_map(self, num_disparites, block_size):
@@ -64,12 +65,13 @@ class StereoDisparityMap:
         gray_right = cv2.cvtColor(self.right_image, cv2.COLOR_BGR2GRAY)
         stereo = cv2.StereoBM_create(num_disparites, block_size)
         disparity_map = stereo.compute(gray_left, gray_right)
+        pyplot.imshow(disparity_map, 'gray')
+        pyplot.show()
         return disparity_map
 
 
-
-calibrator = Calibrator(5, 7)
-# calibrator.calibrate("./calibration_images/*", "./output_images/")
+calibrator = Calibrator(6, 9)
+# calibrator.calibrate("./calibration_images/standard/*", "./output_images/")
 calibrator.load_parameters()
 
 # image paths for stereo images
@@ -82,7 +84,9 @@ right_image = cv2.imread(right_image_path)
 left_image_undistorted = calibrator.undistort_image(left_image)
 right_image_undistorted = calibrator.undistort_image(right_image)
 
-disparity_mapper = StereoDisparityMap(left_image_undistorted, right_image_undistorted)
+
+
+disparity_mapper = StereoDisparityMap(left_image, right_image)
 
 
 def recalculate_SGBM():
@@ -120,7 +124,9 @@ canvas.pack()
 
 photo = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
 
+
 canvas.create_image(0, 0, image=photo, anchor=NW)
+canvas.pack(fill="both")
 
 size = Label(window, text="Window Size")
 size.pack(anchor=W)
