@@ -24,10 +24,12 @@ def main():
     print('loading images...')
     # imgL = downsample_image(cv.imread("./input_images/aloeL.jpg"), 1)  # downscale images for faster processing
     # imgR = downsample_image(cv.imread("./input_images/aloeR.jpg"), 1)
+    imgL = downsample_image(cv.imread("./input_images/left3.jpg"), 3)  # downscale images for faster processing
+    imgR = downsample_image(cv.imread("./input_images/right3.jpg"), 3)
 
     # disparity range is tuned for 'aloe' image pair
     window_size = 3
-    min_disp = 16
+    min_disp = -1
     num_disp = 112-min_disp
     stereo = cv.StereoSGBM_create(
         minDisparity = min_disp,
