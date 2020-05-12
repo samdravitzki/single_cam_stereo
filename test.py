@@ -10,6 +10,7 @@ Resulting .ply file cam be easily viewed using MeshLab ( http://meshlab.sourcefo
 
 import numpy as np
 import cv2 as cv
+from Calibrator import Calibrator
 
 
 def downsample_image(image, reduce_factor):
@@ -32,6 +33,10 @@ def main():
     # imgR = downsample_image(cv.imread("./input_images/aloeR.jpg"), 1)
     imgL = downsample_image(cv.imread("./input_images/left3.jpg"), 3)  # downscale images for faster processing
     imgR = downsample_image(cv.imread("./input_images/right3.jpg"), 3)
+    calibrator = Calibrator(6, 9)
+    calibrator.load_parameters()
+    imgL = calibrator.undistort_image(imgL)
+    imgR = calibrator.undistort_image(imgR)
 
     # disparity range is tuned for 'aloe' image pair
     window_size = 3
@@ -70,12 +75,13 @@ def main():
     norm_filtered_img = ((filtered_img.astype(np.float32) / 16.0) - min_disp) / num_disp
 
     cv.imshow('left', imgL)
+    cv.imshow('right', imgR)
     cv.imshow('disparity', norm_filtered_img)
     cv.waitKey()
 
     print('Done')
 
-
+# TODO implement the filtering into the Tuners
 if __name__ == '__main__':
     main()
 
