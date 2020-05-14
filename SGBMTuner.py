@@ -35,8 +35,8 @@ image_size = (image_width, image_height)
 
 # imgLeft = downsample_image(cv2.imread("./input_images/aloeL.jpg"), 1)
 # imgRight = downsample_image(cv2.imread("./input_images/aloeR.jpg"), 1)
-imgLeft = downsample_image(cv2.imread("./input_images/left3.jpg"), 3)
-imgRight = downsample_image(cv2.imread("./input_images/right3.jpg"), 3)
+imgLeft = downsample_image(cv2.imread("./input_images/left.jpg"), 3)
+imgRight = downsample_image(cv2.imread("./input_images/right.jpg"), 3)
 
 
 width_left, height_left = imgLeft.shape[:2]

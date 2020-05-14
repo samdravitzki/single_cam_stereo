@@ -132,38 +132,24 @@ class Calibrator:
 
 
 def rectify_stereo_pair_uncalibrated(imgL, imgR, calibrator):
-    # Initiate a SIFT detector for finding image feature points
-    orb = cv2.ORB_create()
-    # Find feature points in imgL
-    keyPointsL, desL = orb.detectAndCompute(cv2.cvtColor(imgL, cv2.COLOR_RGB2GRAY), None)
+    # imgL = calibrator.undistort_image(imgL)
+    # imgR = calibrator.undistort_image(imgR)
+    # findGoodPoints_opticalFlow(imgL, imgR)
 
-    # Find corresponding feature points in imgR
-    keyPointsR, desR = orb.detectAndCompute(cv2.cvtColor(imgR, cv2.COLOR_RGB2GRAY), None)
+    width, height = imgL.shape[:2]
 
-    # bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    bf = cv2.BFMatcher()
-    matches = bf.knnMatch(desL, desR, k=2)
-    # matches = sorted(matches, key=lambda x: x.distance)
+    F, mask, left_points, right_points = findFundementalMatrix(imgL, imgR)
 
-    good = []
-    for m, n in matches:
-        if m.distance < 0.60 * n.distance:
-            good.append(m)
+    # Select only inlier points
+    left_points = left_points[mask.ravel() == 1]
+    right_points = right_points[mask.ravel() == 1]
 
-    matchedImg = None
-    matchedImg2 = cv2.drawMatches(imgL, keyPointsL, imgR, keyPointsR, good, flags=2, outImg=matchedImg)
-
-    pyplot.imshow(matchedImg2), pyplot.show()
-
-    cv2.waitKey(0)
-
-    # Get all of the matches and place them in seperate lists for each image
-    left_points = np.float32([keyPointsL[match.queryIdx].pt for match in good])
-    right_points = np.float32([keyPointsR[match.trainIdx].pt for match in good])
-    # Calculate fundemental matrix from the feature point pair
-    F, mask = cv2.findFundamentalMat(left_points, right_points, cv2.FM_LMEDS)
-    left_points = left_points.flatten()
-    right_points = right_points.flatten()
+    linesL, linesR = calcualteEpilines(left_points, right_points, F)
+    img5, img6 = drawlines(imgL.copy(), imgR.copy(), linesL, left_points, right_points)
+    img3, img4 = drawlines(imgR.copy(), imgL.copy(), linesR, right_points, left_points)
+    pyplot.subplot(121), pyplot.imshow(img5)
+    pyplot.subplot(122), pyplot.imshow(img3)
+    pyplot.show()
 
     # Rectify the images
     ret, h_left, h_right = cv2.stereoRectifyUncalibrated(left_points, right_points, F, (imgL.shape[1], imgL.shape[0]))
@@ -172,20 +158,33 @@ def rectify_stereo_pair_uncalibrated(imgL, imgR, calibrator):
     # h_left = S.dot(h_left)
 
     # Apply the rectification transforms to the images
-    camera_matrix = calibrator.camera_matrix
-    distortion = calibrator.distortion_coeff
-    imgsize = (imgL.shape[1], imgL.shape[0])
-    map1x, map1y, map2x, map2y = remap(camera_matrix, distortion, h_left, h_right, imgsize)
+    # camera_matrix = calibrator.camera_matrix
+    # distortion = calibrator.distortion_coeff
+    # imgsize = (imgL.shape[1], imgL.shape[0])
+    # map1x, map1y, map2x, map2y = remap(camera_matrix, distortion, h_left, h_right, imgsize)
+    #
+    # rectified_left = cv2.remap(imgL, map1x, map1y,
+    #                            interpolation=cv2.INTER_LINEAR)
+    #
+    # rectified_right = cv2.remap(imgR, map2x, map2y,
+    #                             interpolation=cv2.INTER_LINEAR)
 
-    rectified_left = cv2.remap(imgL, map1x, map1y,
-                               interpolation=cv2.INTER_LINEAR,
-                               borderMode=cv2.BORDER_CONSTANT,
-                               borderValue=(0, 0, 0, 0))
+    rectified_left = cv2.warpPerspective(imgL, h_left, (height, width))
+    rectified_right = cv2.warpPerspective(imgR, h_right, (height, width))
 
-    rectified_right = cv2.remap(imgR, map2x, map2y,
-                                interpolation=cv2.INTER_LINEAR,
-                                borderMode=cv2.BORDER_CONSTANT,
-                                borderValue=(0, 0, 0, 0))
+    F, mask, left_points, right_points = findFundementalMatrix(rectified_left, rectified_right)
+
+    # Select only inlier points
+    left_points = left_points[mask.ravel() == 1]
+    right_points = right_points[mask.ravel() == 1]
+
+    # Draw epilines on the image
+    # linesL, linesR = calcualteEpilines(left_points, right_points, F)
+    # rectified_left, img6 = drawlines(rectified_left.copy(), rectified_right.copy(), linesL, left_points, right_points)
+    # rectified_right, img4 = drawlines(rectified_right.copy(), rectified_left.copy(), linesR, right_points, left_points)
+    # pyplot.subplot(121), pyplot.imshow(img5)
+    # pyplot.subplot(122), pyplot.imshow(img3)
+    # pyplot.show()
 
     # Test display the rectified images
     cv2.imshow('Left RECTIFIED', rectified_left)
@@ -193,18 +192,95 @@ def rectify_stereo_pair_uncalibrated(imgL, imgR, calibrator):
     pyplot.show()
     cv2.waitKey(0)
 
+
+
     return rectified_left, rectified_right
 
+
+def findFundementalMatrix(imgL, imgR):
+    # # Initiate a SIFT detector for finding image feature points
+    orb = cv2.ORB_create(2000)
+    # # Find feature points in imgL
+    keyPointsL, desL = orb.detectAndCompute(cv2.cvtColor(imgL, cv2.COLOR_RGB2GRAY), None)
+    #
+    # # Find corresponding feature points in imgR
+    keyPointsR, desR = orb.detectAndCompute(cv2.cvtColor(imgR, cv2.COLOR_RGB2GRAY), None)
+
+    left_points, right_points, good = findBestMatches(keyPointsL, keyPointsR, desL, desR)
+
+    # matchedImg = None
+    # matchedImg2 = cv2.drawMatches(imgL, keyPointsL, imgR, keyPointsR, good, flags=2, outImg=matchedImg)
+    #
+    # pyplot.imshow(matchedImg2), pyplot.show()
+    #
+    # cv2.waitKey(0)
+    # Calculate fundemental matrix from the feature point pair
+    F, mask = cv2.findFundamentalMat(left_points, right_points, cv2.FM_LMEDS)
+    return F, mask, left_points, right_points
+
+def calcualteEpilines(left_points, right_points, F):
+    # Find epilines corresponding to points in right image (second image) and
+    # drawing its lines on left image
+    linesL = cv2.computeCorrespondEpilines(right_points.reshape(-1, 1, 2), 2, F)
+    linesL = linesL.reshape(-1, 3)
+
+    # Find epilines corresponding to points in left image (first image) and
+    # drawing its lines on right image
+    linesR = cv2.computeCorrespondEpilines(left_points.reshape(-1, 1, 2), 1, F)
+    linesR = linesR.reshape(-1, 3)
+
+    return linesL, linesR
+
+
+def drawlines(img1, img2, lines, pts1, pts2):
+    r, c = img1.shape[:2]
+    # img1 = cv2.cvtColor(img1, cv2.COLOR_GRAY2BGR)
+    # img2 = cv2.cvtColor(img2, cv2.COLOR_GRAY2BGR)
+    for r, pt1, pt2 in zip(lines, pts1, pts2):
+        color = tuple(np.random.randint(0, 255, 3).tolist())
+        x0, y0 = map(int, [0, -r[2]/r[1]])
+        x1, y1 = map(int, [c, -(r[2]+r[0]*c)/r[1]])
+        img1 = cv2.line(img1, (x0, y0), (x1, y1), color, 1)
+        img1 = cv2.circle(img1, tuple(pt1), 5, color, -1)
+        img2 = cv2.circle(img2, tuple(pt2), 5, color, -1)
+    return img1, img2
+
+def findBestMatches(keyPointsL, keyPointsR, desL, desR):
+    # # bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+    matches = bf.knnMatch(desL, desR, k=2)
+    # matches = sorted(matches, key=lambda x: x.distance)
+
+    good = []
+    ptsL = []
+    ptsR = []
+
+    for m, n in matches:
+        if m.distance < 0.68 * n.distance:
+            good.append(m)
+            ptsR.append(keyPointsR[m.trainIdx].pt)
+            ptsL.append(keyPointsL[m.queryIdx].pt)
+
+    ptsL = np.float32(ptsL)
+    ptsR = np.float32(ptsR)
+
+    return ptsL, ptsR, good
 
 def remap(camera_matrix, distortion, h_left, h_right, imgsize):
     r_left = la.inv(camera_matrix).dot(h_left).dot(camera_matrix)
     r_right = la.inv(camera_matrix).dot(h_right).dot(camera_matrix)
+    height, width = imgsize
+
+    optimal_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+        camera_matrix,
+        distortion,
+        (width, height), 1, (width, height))
 
     map1x, map1y = cv2.initUndistortRectifyMap(
         camera_matrix,
         distortion,
         r_left,
-        camera_matrix,
+        optimal_camera_matrix,
         imgsize,
         cv2.CV_16SC2
     )
@@ -213,7 +289,7 @@ def remap(camera_matrix, distortion, h_left, h_right, imgsize):
         camera_matrix,
         distortion,
         r_right,
-        camera_matrix,
+        optimal_camera_matrix,
         imgsize,
         cv2.CV_16SC2
     )
@@ -284,3 +360,45 @@ def rectify_shearing(H1, H2, imsize):
     return np.array([[k1, k2, 0],
                      [0, 1, 0],
                      [0, 0, 1]], dtype=float)
+
+
+def findGoodPoints_opticalFlow(imgL, imgR):
+    grayL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
+    grayR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
+
+    feature_params = dict(maxCorners=100,
+                          qualityLevel=0.3,
+                          minDistance=7,
+                          blockSize=7)
+
+    lk_params = dict(winSize=(15, 15),
+                     maxLevel=2,
+                     criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+    # Random colors
+    color = np.random.randint(0, 25, (100, 3))
+    maskR = np.zeros_like(imgR)
+
+    left_points = cv2.goodFeaturesToTrack(grayL, mask=None, **feature_params)
+
+    right_points, st, err = cv2.calcOpticalFlowPyrLK(grayL, grayR, left_points, None, **lk_params)
+
+    # Select the good points
+    good_right_points = right_points[st == 1]
+    good_left_points = left_points[st == 1]
+
+    # draw the tracks
+    for i, (left, right) in enumerate(zip(good_left_points, good_right_points)):
+        a, b = left.ravel()
+        c, d = right.ravel()
+
+        imgL = cv2.circle(imgL, (a, b), 4, color[i].tolist(), 2)
+        imgR = cv2.circle(imgR, (c, d), 4, color[i].tolist(), 2)
+        maskR = cv2.line(maskR, (a, b), (c, d), color[i].tolist(), 2)
+        # imgR = cv2.circle(imgR, (a, b), 5, color[i].tolist(), -1)
+
+
+    img = cv2.add(imgR, maskR)
+    cv2.imshow('Left Image', imgL)
+    cv2.imshow('Right Image', img)
+    cv2.waitKey(0)
