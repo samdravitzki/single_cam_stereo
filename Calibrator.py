@@ -172,13 +172,14 @@ def rectify_stereo_pair_uncalibrated(imgL, imgR, calibrator):
     rectified_left = cv2.warpPerspective(imgL, h_left, (height, width))
     rectified_right = cv2.warpPerspective(imgR, h_right, (height, width))
 
-    F, mask, left_points, right_points = findFundementalMatrix(rectified_left, rectified_right)
+    ## DRAW RECALCULATED EPILINES ##
+    # F, mask, left_points, right_points = findFundementalMatrix(rectified_left, rectified_right)
+    #
+    # # Select only inlier points
+    # left_points = left_points[mask.ravel() == 1]
+    # right_points = right_points[mask.ravel() == 1]
+    #
 
-    # Select only inlier points
-    left_points = left_points[mask.ravel() == 1]
-    right_points = right_points[mask.ravel() == 1]
-
-    # Draw epilines on the image
     # linesL, linesR = calcualteEpilines(left_points, right_points, F)
     # rectified_left, img6 = drawlines(rectified_left.copy(), rectified_right.copy(), linesL, left_points, right_points)
     # rectified_right, img4 = drawlines(rectified_right.copy(), rectified_left.copy(), linesR, right_points, left_points)
@@ -186,7 +187,7 @@ def rectify_stereo_pair_uncalibrated(imgL, imgR, calibrator):
     # pyplot.subplot(122), pyplot.imshow(img3)
     # pyplot.show()
 
-    # Test display the rectified images
+    ## Display rectified images ##
     cv2.imshow('Left RECTIFIED', rectified_left)
     cv2.imshow('Right RECTIFIED', rectified_right)
     pyplot.show()

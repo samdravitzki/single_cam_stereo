@@ -35,8 +35,8 @@ image_size = (image_width, image_height)
 
 # imgLeft = downsample_image(cv2.imread("./input_images/aloeL.jpg"), 1)
 # imgRight = downsample_image(cv2.imread("./input_images/aloeR.jpg"), 1)
-imgLeft = downsample_image(cv2.imread("./input_images/left.jpg"), 3)
-imgRight = downsample_image(cv2.imread("./input_images/right.jpg"), 3)
+imgLeft = downsample_image(cv2.imread("./input_images/left3.jpg"), 3)
+imgRight = downsample_image(cv2.imread("./input_images/right3.jpg"), 3)
 
 
 width_left, height_left = imgLeft.shape[:2]
@@ -63,8 +63,8 @@ imgLeft_r, imgRight_r = rectify_stereo_pair_uncalibrated(imgLeft, imgRight, cali
 class SGBMTuner:
     def __init__(self, imgL, imgR):
         self.rectified_pair = (imgL, imgR)
-        self.MAX_DISPARITY = 64  # Constant
-        self.MDIS = 16
+        self.MAX_DISPARITY = 32  # Constant
+        self.MDIS = -1
         self.NDIS = self.MAX_DISPARITY - self.MDIS
         self.BS = 16
         self.WS = 3
