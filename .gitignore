@@ -4,3 +4,5 @@ camera_parameters/
 input_images/
 output_images/
 venv/
+
+sfm_images/
